@@ -437,7 +437,7 @@ def full_gp(x, y_ave, y_std, zz):
 
     return fit, fit_std, x_fit
 
-def extrapolation(y, x, errors, zz, lin_plot=0, exp_plot=0, data_plot=0, show=0):
+def extrapolation(y, x, errors, zz, show_extrap=0, show_pauli=0):
     points = 2
 
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -449,33 +449,48 @@ def extrapolation(y, x, errors, zz, lin_plot=0, exp_plot=0, data_plot=0, show=0)
     for i in range(len(y)):
         popt_l, pcov_l = curve_fit(linear, errors[0:points], y[i][0:points])
         lin.append(popt_l[1])
-        if lin_plot:
-            plt.plot(errors_ext, linear(errors_ext, popt_l[0], popt_l[1]))
 
-        if exp_plot:
+        try:
             popt_e, pcov_e = curve_fit(exponential, errors, y[i], p0=[popt_l[1], -popt_l[0] / popt_l[1], 0])  # ,bounds=([-2., -1., -1], [2., 1., 1.]))
-            exp.append(popt_e[0] + popt_e[2])
-            plt.plot(x_line, exponential(x_line, popt_e[0], popt_e[1], popt_e[2]))
-        else:
-            exp.append(popt_l[1])
+            print("popt_e", popt_e, x[i]*2*zz)
+            if abs(popt_e[0]) > 1.5 or abs(popt_e[1]) > 1.5 or abs(popt_e[2]) > 1.5:
+                popt_e, pcov_e = curve_fit(linear, errors, y[i])
+                exp.append(popt_e[1])
+                k = 1
+            else:
+                exp.append(popt_e[0] + popt_e[2])
+                k = 0
 
-        if data_plot:
+        except:
+            popt_e, pcov_e = curve_fit(linear, errors, y[i])
+            exp.append(popt_e[1])
+            k = 1
+            print('error', i)
+
+        if show_extrap:
+
+            plt.plot(errors_ext, linear(errors_ext, popt_l[0], popt_l[1]))
+            if k:
+                plt.plot(errors_ext, linear(errors_ext, popt_e[0], popt_e[1]))
+            else:
+                plt.plot(x_line, exponential(x_line, popt_e[0], popt_e[1], popt_e[2]))
+
             for j in range(5):
                 plt.scatter(errors[j], y[i][j], color=colors[j])
-        if lin_plot or exp_plot or data_plot:
-            if show == i:
-                plt.xlabel('Error amplification factor', fontsize=20)
-                plt.ylabel('Expectation value', fontsize=20)
-                plt.show()
 
-    if show:
+            plt.xlabel('Error amplification factor', fontsize=20)
+            plt.ylabel('Expectation value', fontsize=20)
+            plt.show()
+
+    if show_pauli:
+
         for j in range(len(y[0])):
             plt.plot(x * 2. * zz, y[:, j])
-        plt.plot(x * 2. * zz, lin_extrapolated)
-        if exp_plot:
-            plt.plot(x * 2. * zz, exp_extrapolated)
+        plt.plot(x * 2. * zz, lin, label="Linear extrapolation")
+        plt.plot(x * 2. * zz, exp, label="Exponential extrapolation")
         plt.xlabel(r'$Rotation\ angle\ /\ 2 \pi $')
         plt.ylabel('Eigenvalue')
+        plt.legend()
         plt.show()
 
     return lin, exp
@@ -487,14 +502,13 @@ def error_mitigation(y, thetas, errors, zz_freq, plot_error_mit=False):
     exp_extrapolated = np.zeros(s)
     for i in range(5):
         print('shape y[i]', np.shape(y[i]))
-        lin_extrapolated[i], exp_extrapolated[i] = extrapolation(y[i], thetas, errors, zz_freq, lin_plot=plot_error_mit,
-                                                                 exp_plot=plot_error_mit, data_plot=plot_error_mit, show=0)
+        lin_extrapolated[i], exp_extrapolated[i] = extrapolation(y[i], thetas, errors, zz_freq, show_extrap=0, show_pauli=1)
 
     return lin_extrapolated, exp_extrapolated
 
 def energy(y_ave, x, errors, zz_freq, plot_error_mit=False):
     fig = plt.figure(0)
-    extrap_lin, extrap_lin = error_mitigation(y_ave, x, errors, zz_freq, plot_error_mit)
+    extrap_lin, extrap_exp = error_mitigation(y_ave, x, errors, zz_freq, plot_error_mit)
 
     y_min = []
     y_argmin = []
